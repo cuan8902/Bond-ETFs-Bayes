@@ -1,0 +1,1 @@
+2026-10-21: Used Claude to help set up R/JAGS, download the data and write the NAV reading function.
