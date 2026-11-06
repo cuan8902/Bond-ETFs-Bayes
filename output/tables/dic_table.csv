@@ -1,0 +1,5 @@
+model,description,mean_deviance,penalty,DIC
+M1,Pooled: one VIX slope for all funds,919.8,3,922.8
+M2,Bond-type slopes and persistence,776.1,9.8,785.9
+M3,Hierarchical: fund slopes grouped by bond type,762.5,15.8,778.3
+M4,M3 with Student-t errors,-1062.9,38,-1024.9
