@@ -1,0 +1,20 @@
+
+model {
+  for (i in 1:N) {
+    premium[i] ~ dt(mu[i], tau, nu)                                              # each premium follows a Student-t around its predicted value
+    mu[i] <- b0[etf[i]] + b1[etf[i]] * vix_c[i] + b2[type[i]] * lag_premium[i]  # prediction uses the fund and its bond type
+  }
+  for (j in 1:J) {
+    b0[j] ~ dnorm(0, 4)                        # prior for each fund's intercept: centred on 0, SD 0.5
+    b1[j] ~ dnorm(mu_b[etf_type[j]], tau_b)    # each fund's VIX slope is drawn from its bond type's distribution
+  }
+  for (k in 1:K) {
+    mu_b[k] ~ dnorm(0, 100)                    # prior for each bond type's average VIX slope: centred on 0, SD 0.1
+    b2[k] ~ dnorm(0.5, 16)                     # prior for each bond type's persistence: centred on 0.5, SD 0.25
+  }
+  sigma_b ~ dunif(0, 0.1)                      # prior for how much fund slopes differ within a bond type
+  tau_b <- 1 / pow(sigma_b, 2)                 # turn that SD into a precision for JAGS
+  tau ~ dgamma(1, 0.25)                        # prior for the precision of the errors
+  sigma <- 1 / sqrt(tau)                       # turn the precision into a scale so it is easier to read
+  nu ~ dgamma(2, 0.1)                          # prior for the degrees of freedom: small values mean fat tails
+}
