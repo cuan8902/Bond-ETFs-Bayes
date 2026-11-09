@@ -154,3 +154,76 @@ conv_rob <- check_convergence(fit_rob$samples, "robustness")
 print(conv_nav)
 print(conv_rob)
 
+# ---- Second model with Student-t errors ----
+
+# Write out the second model with Student-t errors instead of Normal ones
+nav_t_model <- "
+model {
+  for (n in 1:N) {
+    dnav[n] ~ dt(mu[n], tau_N, nu)                         # next week's NAV change follows a Student-t around its prediction
+    mu[n] <- alpha[type[n]] + gamma[type[n]] * premium[n]   # prediction uses this week's premium and the bond type
+  }
+  for (b in 1:B) {
+    alpha[b] ~ dnorm(0, 4)    # prior for each bond type's intercept: centred on 0, SD 0.5
+    gamma[b] ~ dnorm(0, 4)    # prior for each bond type's catch-up effect: centred on 0, SD 0.5
+  }
+  tau_N ~ dgamma(1, 1)        # prior for the precision of the errors
+  sigma_N <- 1 / sqrt(tau_N)  # turn the precision into a scale so it is easier to read
+  nu ~ dgamma(2, 0.1)         # prior for the degrees of freedom, the same as M4
+}"
+
+# Give each of the 3 chains spread-out starting values, including the degrees of freedom
+inits_nav_t <- lapply(1:3, function(k) c(list(
+  alpha = rnorm(B, 0, 1), gamma = rnorm(B, 0, 1), tau_N = runif(1, 0.2, 5), nu = c(3, 10, 30)[k]
+), chain_seed(k)))
+
+# Fit the model with more draws, because Student-t models mix more slowly
+fit_nav_t <- fit_jags(nav_t_model, data_nav, inits_nav_t, c("alpha", "gamma", "sigma_N", "nu"), iter = 20000)
+saveRDS(fit_nav_t$samples, "output/nav_t_samples.rds")  # save under a new name so the Normal results are kept
+
+# Write out the robustness check with Student-t errors
+rob_t_model <- "
+model {
+  for (n in 1:N) {
+    dnav[n] ~ dt(mu[n], tau_N, nu)   # next week's NAV change follows a Student-t around its prediction
+    mu[n] <- alpha[type[n]] + gamma[type[n]] * premium[n] + delta[type[n]] * vix_change[n]  # adds the change in VIX
+  }
+  for (b in 1:B) {
+    alpha[b] ~ dnorm(0, 4)   # prior for each bond type's intercept
+    gamma[b] ~ dnorm(0, 4)   # prior for each bond type's catch-up effect
+    delta[b] ~ dnorm(0, 4)   # prior for each bond type's VIX-change effect
+  }
+  tau_N ~ dgamma(1, 1)        # prior for the precision of the errors
+  sigma_N <- 1 / sqrt(tau_N)  # turn the precision into a scale
+  nu ~ dgamma(2, 0.1)         # prior for the degrees of freedom
+}"
+
+# Give each of the 3 chains spread-out starting values
+inits_rob_t <- lapply(1:3, function(k) c(list(
+  alpha = rnorm(B, 0, 1), gamma = rnorm(B, 0, 1), delta = rnorm(B, 0, 1),
+  tau_N = runif(1, 0.2, 5), nu = c(3, 10, 30)[k]
+), chain_seed(k)))
+
+# Fit the robustness model and save its draws under a new name
+fit_rob_t <- fit_jags(rob_t_model, data_rob, inits_rob_t, c("alpha", "gamma", "delta", "sigma_N", "nu"), iter = 20000)
+saveRDS(fit_rob_t$samples, "output/nav_robust_t_samples.rds")
+
+# Put gamma from the Normal and Student-t versions side by side
+gamma_t <- gamma_table(fit_nav_t$samples)
+gamma_compare_t <- tibble(
+  type = types,
+  normal = gamma_nav$mean,
+  normal_95 = paste0("(", gamma_nav$lower, ", ", gamma_nav$upper, ")"),
+  student_t = gamma_t$mean,
+  student_t_95 = paste0("(", gamma_t$lower, ", ", gamma_t$upper, ")"),
+  prob_pos_t = gamma_t$prob_pos)
+print(gamma_compare_t)
+print(gamma_table(fit_rob_t$samples))   # gamma from the Student-t robustness check
+
+# Check both Student-t models have converged
+print(check_convergence(fit_nav_t$samples, "nav_model_t"))
+print(check_convergence(fit_rob_t$samples, "robustness_t"))
+
+# Degrees of freedom summary to send Kuon
+summary(fit_nav_t$samples[, "nu"])
+
