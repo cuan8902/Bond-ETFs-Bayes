@@ -1,0 +1,10 @@
+model,parameters,worst_rhat,smallest_ess,all_converged
+Gibbs sampler (M1),4,1,29794,TRUE
+M1,3,1,30000,TRUE
+M2,10,1,16315,TRUE
+M3,22,1.001,4326,TRUE
+M4 (main model),23,1.007,5935,TRUE
+Second model,7,1,17335,TRUE
+Second model + VIX change,10,1,16683,TRUE
+"Second model, Student-t",8,1.001,10383,TRUE
+"Second model + VIX change, t",11,1,15170,TRUE
