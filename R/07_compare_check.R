@@ -112,3 +112,75 @@ fig_mu_b <- ggplot(mu_b_long, aes(x = slope, fill = bond_type)) +
 fig_mu_b
 ggsave("output/figures/fig6_mu_b_posteriors.png", fig_mu_b, width = 8, height = 4, dpi = 300)
 
+# ---- Shrinkage plot: each fund's VIX slope next to its bond type's average ----
+
+# Step 1: summarise each fund's VIX slope and each bond type's average slope from M4
+
+# Load M4's draws and stack the 3 chains into one table
+draws4 <- as.matrix(readRDS("output/m4_samples.rds"))
+
+# List the funds in the order JAGS numbered them, and each fund's bond type
+etf_levels <- c("GOVT", "IEF", "TLT", "LQD", "IGIB", "HYG", "USHY")
+etf_type   <- c(1, 1, 1, 2, 2, 3, 3)                       # 1 = Treasury, 2 = Investment grade, 3 = High yield
+type_names <- c("Treasury", "Investment grade", "High yield")
+
+# Name the columns that hold the fund slopes and the bond-type averages
+b1_cols <- paste0("b1[", 1:7, "]")                          # b1[1] to b1[7]: one slope per fund
+mu_cols <- paste0("mu_b[", 1:3, "]")                        # mu_b[1] to mu_b[3]: one average per bond type
+
+# For each fund, work out the middle value and 95% interval of its slope, for a 40-point VIX rise
+fund_slopes <- tibble(
+  etf       = etf_levels,
+  bond_type = type_names[etf_type],                                  # the fund's bond type, in words
+  median    = apply(draws4[, b1_cols], 2, median) * 40,              # middle value of the slope draws
+  lo95      = apply(draws4[, b1_cols], 2, quantile, 0.025) * 40,     # bottom of the 95% interval
+  hi95      = apply(draws4[, b1_cols], 2, quantile, 0.975) * 40)     # top of the 95% interval
+
+# Do the same for each bond type's average slope
+type_slopes <- tibble(
+  bond_type = type_names,
+  median    = apply(draws4[, mu_cols], 2, median) * 40,              # middle value of the average slope
+  lo95      = apply(draws4[, mu_cols], 2, quantile, 0.025) * 40,     # bottom of the 95% interval
+  hi95      = apply(draws4[, mu_cols], 2, quantile, 0.975) * 40)     # top of the 95% interval
+
+# Show both tables
+fund_slopes
+type_slopes
+
+# Show how much fund slopes differ within a bond type, for a 40-point VIX rise
+quantile(draws4[, "sigma_b"] * 40, c(0.025, 0.5, 0.975))
+
+# Step 3: compare each fund's slope on its own with its slope in M4, then draw the shrinkage plot
+
+# Load the no-pooling draws and stack the 3 chains into one table
+draws_nopool <- as.matrix(readRDS("output/m4_nopool_samples.rds"))
+
+# Put each fund's slope on its own, its slope in M4 and its bond type's average side by side
+shrink <- fund_slopes |>
+  select(etf, bond_type, hierarchical = median) |>                        # keep M4's middle value for each fund
+  mutate(on_its_own   = apply(draws_nopool[, b1_cols], 2, median) * 40,   # middle value when the fund is estimated alone
+         type_average = type_slopes$median[match(bond_type, type_slopes$bond_type)],   # the fund's bond-type average from M4
+         bond_type    = factor(bond_type, levels = type_names),           # set the order the bond types appear in
+         etf          = factor(etf, levels = rev(etf_levels)))            # set the order the funds appear in
+
+# Show the table and save it for the slides
+shrink
+write_csv(shrink, "output/tables/shrinkage_table.csv")
+
+# Draw an arrow for each fund, from its slope on its own to its slope in M4
+fig_shrink <- ggplot(shrink, aes(y = etf)) +
+  geom_vline(xintercept = 0, colour = "grey80") +                                       # thin line at no effect
+  geom_vline(aes(xintercept = type_average), linetype = "dashed", colour = "grey40") +   # dashed line at the bond type's average
+  geom_segment(aes(x = on_its_own, xend = hierarchical, yend = etf),
+               arrow = arrow(length = unit(0.15, "cm"))) +                    # arrow showing how far M4 moved the slope
+  geom_point(aes(x = on_its_own), shape = 21, fill = "white", size = 3) +     # hollow dot: the fund estimated on its own
+  geom_point(aes(x = hierarchical), size = 3) +                               # filled dot: the fund in M4
+  facet_grid(bond_type ~ ., scales = "free_y", space = "free_y") +            # one panel per bond type, stacked
+  labs(x = "Change in premium (%) for a 40-point rise in the VIX", y = NULL,
+       title = "Shrinkage: M4 pulls each fund's slope towards its bond type's average",
+       subtitle = "Hollow dot: fund on its own. Filled dot: M4. Dashed line: bond-type average") +   # add labels and a title
+  theme_minimal()                                                             # use a clean, plain style
+
+# Show the figure and save it for the slides
+fig_shrink
+ggsave("output/figures/fig8_shrinkage.png", fig_shrink, width = 8, height = 4.5, dpi = 300)
