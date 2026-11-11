@@ -65,3 +65,10 @@ gelman.diag(s4_nopool, multivariate = FALSE)
 
 # Count how many effectively independent draws each parameter has
 effectiveSize(s4_nopool)
+
+# Keep only the LQD and HYG weeks where the VIX was at least 20 points above its usual level
+stress_weeks <- train |> filter(etf %in% c("LQD", "HYG"), vix_c >= 20)
+# For each fund, count those weeks, how many had a discount bigger than 2%, and what share that is
+stress_weeks |> group_by(etf) |> summarise(weeks = n(), big_discounts = sum(premium < -2), share = mean(premium < -2))
+# List those weeks with their date, centred VIX and premium, oldest first
+stress_weeks |> select(etf, date, vix_c, premium) |> arrange(etf, date)

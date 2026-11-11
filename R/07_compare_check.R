@@ -184,3 +184,15 @@ fig_shrink <- ggplot(shrink, aes(y = etf)) +
 # Show the figure and save it for the slides
 fig_shrink
 ggsave("output/figures/fig8_shrinkage.png", fig_shrink, width = 8, height = 4.5, dpi = 300)
+
+# Crisis weeks check ----
+# Keep only the LQD and HYG weeks where the VIX was at least 20 points above its usual level
+stress_weeks <- train |> filter(etf %in% c("LQD", "HYG"), vix_c >= 20)
+# For each fund, count those weeks, how many had a discount bigger than 2%, and what share that is
+stress_weeks |> group_by(etf) |> summarise(weeks = n(), big_discounts = sum(premium < -2), share = mean(premium < -2))
+# List those weeks with their date, centred VIX and premium, oldest first
+stress_weeks |> select(etf, date, vix_c, premium) |> arrange(etf, date)
+
+# Save the list of crisis weeks as a table file so we can put it on a slide
+write_csv(stress_weeks |> select(etf, date, vix_c, premium) |> arrange(etf, date), "output/tables/crisis_weeks.csv")
+
