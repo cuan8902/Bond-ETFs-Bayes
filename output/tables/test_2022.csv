@@ -1,0 +1,5 @@
+type,weeks,coverage_90,mae_m4,mae_naive
+All,364,76.9,0.178,0.219
+High yield,104,48.1,0.368,0.458
+Investment grade,104,73.1,0.187,0.213
+Treasury,156,98.7,0.045,0.063

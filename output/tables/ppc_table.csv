@@ -1,0 +1,3 @@
+statistic,real,sim_5,sim_median,sim_95,real_percentile
+Share of weeks with discount beyond 2%,0.004,0,0.002,0.005,90.1
+Worst discount (%),-2.78,-24.235,-4.291,-1.555,72.6
