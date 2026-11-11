@@ -1,0 +1,33 @@
+
+model {
+  # Go through every training week
+  for (i in 1:N) {
+    # Say each premium is Student-t around its expected value
+    premium[i] ~ dt(mu[i], tau, nu)
+    # Work out the expected premium: fund level + fund VIX slope x VIX + type persistence x last week's premium
+    mu[i] <- b0[etf[i]] + b1[etf[i]] * vix_c[i] + b2[type[i]] * lag_premium[i]
+  }
+  # Go through the 7 funds
+  for (j in 1:7) {
+    # Fund level prior: Normal, mean 0, SD 5 (M4 has SD 0.5)
+    b0[j] ~ dnorm(0, 0.04)
+    # Fund VIX slope: drawn around its bond type's average slope
+    b1[j] ~ dnorm(mu_b[etf_type[j]], tau_b)
+  }
+  # Go through the 3 bond types
+  for (k in 1:3) {
+    # Bond-type average VIX slope prior: Normal, mean 0, SD 1 (M4 has SD 0.1)
+    mu_b[k] ~ dnorm(0, 1)
+    # Persistence prior: Normal, mean 0.5, SD 2.5 (M4 has SD 0.25)
+    b2[k] ~ dnorm(0.5, 0.16)
+  }
+  # Spread of fund slopes within a type: anywhere from 0 to 1 (M4 has 0 to 0.1)
+  sigma_b ~ dunif(0, 1)
+  # Turn that spread into the precision JAGS uses
+  tau_b <- 1 / pow(sigma_b, 2)
+  # Noise precision prior: Gamma(0.01, 0.0025), same average as M4's Gamma(1, 0.25) but far more spread
+  tau ~ dgamma(0.01, 0.0025)
+  # Tail-heaviness prior: same as M4
+  nu ~ dgamma(2, 0.1)
+}
+

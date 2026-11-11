@@ -196,3 +196,144 @@ stress_weeks |> select(etf, date, vix_c, premium) |> arrange(etf, date)
 # Save the list of crisis weeks as a table file so we can put it on a slide
 write_csv(stress_weeks |> select(etf, date, vix_c, premium) |> arrange(etf, date), "output/tables/crisis_weeks.csv")
 
+# Prior predictive simulation ----
+# Fix the random number generator so we get the same numbers every time we run this
+set.seed(417)
+# Set how many fake datasets to make from the priors
+n_sims <- 1000
+# Find which fund (1 to 7) each training week belongs to
+etf_row <- match(train$etf, etf_levels)
+# Find which bond type (1 to 3) each training week belongs to
+type_row <- etf_type[etf_row]
+# Make an empty grid for the fake premiums: one row per fake dataset, one column per training week
+fake <- matrix(NA, nrow = n_sims, ncol = nrow(train))
+# Repeat everything inside the curly brackets once for each fake dataset
+for (s in 1:n_sims) {
+  # Draw a starting level for each of the 7 funds: Normal, mean 0, SD 0.5
+  b0 <- rnorm(7, mean = 0, sd = 0.5)
+  # Draw an average VIX slope for each of the 3 bond types: Normal, mean 0, SD 0.1
+  mu_b <- rnorm(3, mean = 0, sd = 0.1)
+  # Draw how far funds of the same type can differ: anywhere between 0 and 0.1
+  sigma_b <- runif(1, min = 0, max = 0.1)
+  # Draw each fund's VIX slope around its own bond type's average
+  b1 <- rnorm(7, mean = mu_b[etf_type], sd = sigma_b)
+  # Draw how much of last week's premium carries over, for each bond type: Normal, mean 0.5, SD 0.25
+  b2 <- rnorm(3, mean = 0.5, sd = 0.25)
+  # Draw the noise precision from Gamma(1, 0.25) and turn it into a typical noise size
+  sigma <- 1 / sqrt(rgamma(1, shape = 1, rate = 0.25))
+  # Draw how fat the tails are from Gamma(2, 0.1)
+  nu <- rgamma(1, shape = 2, rate = 0.1)
+  # Work out each week's expected premium from the drawn values, the real VIX and last week's real premium
+  mu <- b0[etf_row] + b1[etf_row] * train$vix_c + b2[type_row] * train$lag_premium
+  # Add random Student-t noise to get fake premiums, and store them in row s of the grid
+  fake[s, ] <- mu + sigma * rt(nrow(train), df = nu)
+}
+
+# Show the 1st, 5th, 50th, 95th and 99th percentiles of the real premiums
+quantile(train$premium, c(0.01, 0.05, 0.5, 0.95, 0.99))
+# Show the same percentiles for all the fake premiums together
+quantile(fake, c(0.01, 0.05, 0.5, 0.95, 0.99))
+# Show the share of fake premiums bigger than 10% either way
+mean(abs(fake) > 10)
+# Work out the typical size of the real premiums (the middle value, ignoring plus or minus signs)
+real_typical <- median(abs(train$premium))
+# Work out the same typical size for each fake dataset
+fake_typical <- apply(abs(fake), 1, median)
+# Show the real typical size
+real_typical
+# Show the middle 95% range of the typical size across the 1,000 fake datasets
+quantile(fake_typical, c(0.025, 0.5, 0.975))
+
+# Put the 1,000 fake typical sizes into a table so ggplot can use them
+prior_check <- tibble(typical = fake_typical)
+# Start a chart of the fake typical sizes
+fig7 <- ggplot(prior_check, aes(x = typical)) +
+  # Draw a histogram of the fake typical sizes using 40 bars
+  geom_histogram(bins = 40, fill = "grey70", colour = "white") +
+  # Draw a red vertical line at the real data's typical size
+  geom_vline(xintercept = real_typical, colour = "red", linewidth = 1) +
+  # Use a log scale on the x axis so small and large sizes both show clearly
+  scale_x_log10() +
+  # Add the title and axis labels
+  labs(title = "Prior predictive check (M4)",
+       subtitle = "Typical premium size in 1,000 datasets simulated from the priors; red line = real data",
+       x = "Typical premium size, % (median of |premium|, log scale)",
+       y = "Number of fake datasets") +
+  # Use a clean white background
+  theme_minimal()
+# Show the chart
+fig7
+# Save the chart as a picture file for the slides
+ggsave("output/figures/fig7_prior_predictive.png", fig7, width = 8, height = 4.5, dpi = 300)
+
+# Put the real and fake percentiles side by side in one table
+prior_pred_table <- tibble(percentile = c("1%", "5%", "50%", "95%", "99%"),
+                           real = quantile(train$premium, c(0.01, 0.05, 0.5, 0.95, 0.99)),
+                           prior_predictive = quantile(fake, c(0.01, 0.05, 0.5, 0.95, 0.99)))
+# Save that table as a file for the slides
+write_csv(prior_pred_table, "output/tables/prior_predictive_table.csv")
+
+# Prior vs posterior plot ----
+# Load M4's saved draws as one big table: one row per draw, one column per parameter
+d_m4 <- as.matrix(readRDS("output/m4_samples.rds"))
+# List the six quantities to plot: panel name, M4 column, what to multiply by, the prior's mean and SD on that scale, and the plotting range
+fig9_info <- tibble(
+  label      = c("VIX effect: Treasury", "VIX effect: Inv. grade", "VIX effect: High yield",
+                 "Persistence: Treasury", "Persistence: Inv. grade", "Persistence: High yield"),
+  column     = c("mu_b[1]", "mu_b[2]", "mu_b[3]", "b2[1]", "b2[2]", "b2[3]"),
+  multiply   = c(40, 40, 40, 1, 1, 1),
+  prior_mean = c(0, 0, 0, 0.5, 0.5, 0.5),
+  prior_sd   = c(0.1 * 40, 0.1 * 40, 0.1 * 40, 0.25, 0.25, 0.25),
+  x_from     = c(-1, -1, -1, -0.4, -0.4, -0.4),
+  x_to       = c(0.6, 0.6, 0.6, 1.4, 1.4, 1.4))
+# Make two empty lists to collect the prior curves and the posterior draws
+prior_list <- list()
+post_list <- list()
+# Repeat the steps inside the curly brackets for each of the six quantities
+for (r in 1:nrow(fig9_info)) {
+  # Make 400 evenly spaced points across this quantity's plotting range
+  x <- seq(fig9_info$x_from[r], fig9_info$x_to[r], length.out = 400)
+  # Work out the height of the prior curve at each of those points
+  prior_list[[r]] <- tibble(label = fig9_info$label[r], x = x,
+                            density = dnorm(x, fig9_info$prior_mean[r], fig9_info$prior_sd[r]))
+  # Take this quantity's posterior draws from M4, multiplied onto the right scale
+  # Take this quantity's posterior draws from M4, multiplied onto the right scale
+  values <- d_m4[, fig9_info$column[r]] * fig9_info$multiply[r]
+  # Show what share of draws falls outside the plotting range
+  print(mean(values < fig9_info$x_from[r] | values > fig9_info$x_to[r]))
+  # Keep only the draws inside the plotting range, so a few extreme draws don't stretch the x axis
+  post_list[[r]] <- tibble(label = fig9_info$label[r],
+                           value = values[values >= fig9_info$x_from[r] & values <= fig9_info$x_to[r]])
+}
+# Stack the six prior curves into one table
+prior_curves <- bind_rows(prior_list)
+# Stack the six sets of posterior draws into one table
+post_draws <- bind_rows(post_list)
+# Fix the panel order so it matches the list above
+prior_curves$label <- factor(prior_curves$label, levels = fig9_info$label)
+post_draws$label <- factor(post_draws$label, levels = fig9_info$label)
+
+# Start the chart
+fig9 <- ggplot() +
+  # Draw each posterior as a shaded curve
+  geom_density(data = post_draws, aes(x = value), fill = "steelblue", alpha = 0.5, colour = "steelblue4") +
+  # Draw each prior as a dashed line
+  geom_line(data = prior_curves, aes(x = x, y = density), linetype = "dashed", colour = "grey30") +
+  # Draw a thin grey line at zero
+  geom_vline(xintercept = 0, colour = "grey80") +
+  # Give each quantity its own panel with its own scales, in 2 rows
+  facet_wrap(~ label, nrow = 2, scales = "free") +
+  # Add the title and axis labels
+  labs(title = "Prior vs posterior (M4)",
+       subtitle = "Dashed = prior, shaded = posterior. VIX effects are in % per 40 VIX points",
+       x = "Value", y = "Density") +
+  # Use a clean white background
+  theme_minimal()
+# Show the chart
+fig9
+# Save the chart as a picture file for the slides
+ggsave("output/figures/fig9_prior_vs_posterior.png", fig9, width = 9, height = 5, dpi = 300)
+
+# For each quantity, show the posterior's spread, the prior's spread, and how many times narrower the posterior is
+post_draws |> group_by(label) |> summarise(posterior_sd = sd(value)) |>
+  mutate(prior_sd = fig9_info$prior_sd, times_narrower = prior_sd / posterior_sd)

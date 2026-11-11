@@ -5,3 +5,5 @@
 2026-11-06: Used Claude to help write and interpret the Gibbs sampler (05_gibbs.R) and JAGS models M1–M3 (06_fit_jags.R), and to draft Ryan's M4 brief.
 2026-11-06: Used Claude to help write 06b_nav_model.R and 06c_fit_m4.R, fix errors, and recompute M3’s DIC.
 2026-11-10: Used Claude to help write the shrinkage plot and the no-pooling version of M4.
+2026-11-11: Used Claude to help write the prior predictive simulation.
+2026-11-11: Used Claude to write the prior sensitivity refits.
