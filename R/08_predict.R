@@ -163,7 +163,8 @@ crisis_scenario <- imap_dfr(crisis, function(p, fund) {
   wk4 <- p[, 4]
   tibble(fund = fund,
          type = ifelse(fund == "LQD", "Investment grade", "High yield"),
-         prob_discount_2pc = round(mean(wk4 < disc_cut), 3),
+         prob_discount_week4 = round(mean(wk4 < disc_cut), 3),               # chance of a discount beyond 2% in week 4
+         prob_discount_any = round(mean(rowSums(p < disc_cut) > 0), 3),      # chance of one at least once in the 4 weeks
          p5 = round(quantile(wk4, 0.05), 3),
          p50 = round(median(wk4), 3),
          p95 = round(quantile(wk4, 0.95), 3))

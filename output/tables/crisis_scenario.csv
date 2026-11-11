@@ -1,3 +1,3 @@
-fund,type,prob_discount_2pc,p5,p50,p95
-LQD,Investment grade,0.004,-0.496,-0.139,0.223
-HYG,High yield,0.003,-0.363,0.003,0.384
+fund,type,prob_discount_week4,prob_discount_any,p5,p50,p95
+LQD,Investment grade,0.004,0.012,-0.496,-0.139,0.223
+HYG,High yield,0.003,0.01,-0.363,0.003,0.384
