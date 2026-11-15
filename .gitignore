@@ -47,3 +47,9 @@ po/*~
 
 # RStudio Connect folder
 rsconnect/
+
+# macOS Finder files
+.DS_Store
+
+# Coursework slides and speaker notes (kept local, not published)
+slides/
