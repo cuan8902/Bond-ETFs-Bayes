@@ -2,7 +2,7 @@
 
 **A hierarchical Bayesian analysis of bond ETF premiums under market stress**
 
-Cúán Quinlan and Ryan O’Donnell · ST417 Bayesian Modelling · University of Galway · November 2026
+Cúán Quinlan and Ryan O’Donnell ·
 
 When a bond ETF trades away from the value of the bonds it holds (its NAV), is the market price wrong, or is the NAV out of date? On 19 March 2020, LQD, one of the largest US investment-grade corporate bond ETFs, closed 5% below its NAV. Days later, after the Federal Reserve said it would buy corporate bonds and bond ETFs, the same funds traded at premiums of 3–5%. This project uses Bayesian hierarchical models, fitted by MCMC in R and JAGS, to measure how market stress moves these gaps and which side closes them.
 
