@@ -1,7 +1,7 @@
 # 01_get_data.R: download the VIX and ETF prices
 library(quantmod)
 library(tidyverse)
-#using data from yahoo - said FRED in proposal
+#using data from yahoo 
 getSymbols("^VIX", src = "yahoo", from = "2019-01-01", to = "2023-01-01") #sends request to yahoo for ^VIX(ticker) history
 getSymbols("LQD", src = "yahoo", from = "2019-01-01", to = "2023-01-01") #sends request to yahoo for LQD(ticker) history
 
